@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<fuzzer>
+	<bin path="/bin/ls" />
+	<opt type="prestatic" value="-v" />
+	<opt type="poststatic" value="/home" />
+	<fuzz type="chariter" prefix="-" char="a" length="9999" />
+	<prefuzz cmd="" />
+	<postfuzz cmd="" />
+	<exit level="!0" cmd="" />
+	<display level="!0" />
+	<write level="!0" />
+</fuzzer>

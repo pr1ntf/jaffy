@@ -1,0 +1,161 @@
+#!/usr/local/bin/python
+
+import argparse
+import untangle
+import uuid
+import subprocess
+import time
+
+# Read command line argument for XML file or URL
+print("[!] Parse command line arguments.")
+parser = argparse.ArgumentParser(description='Jaffy. Fuzz a binary. v1')
+parser.add_argument('filename', help='Path to XML file.')
+args = parser.parse_args()
+print("[!] Starting jaffy.")
+print("[!] Filename found:", args.filename)
+
+# Parse XML file
+print("[!] Parsing XML file.")
+xml = untangle.parse(args.filename)
+
+# Build command and options
+path = xml.fuzzer.bin['path']
+print("[!] Binary path is:", path)
+
+# Find prestatic (Place before fuzz options)
+print("[!] Building pre-static options.")
+precmd = path
+for option in xml.fuzzer.opt:
+	opt = option['value']
+	type = option['type']
+	if type == "prestatic":
+		precmd = precmd+" "+opt
+
+# Find poststatic (Place after fuzz options)
+print("[!] Building post-static options.")
+postcmd = ""
+for option in xml.fuzzer.opt:
+	opt = option['value']
+	type = option['type']
+	if type == "poststatic":
+		postcmd = postcmd+" "+opt
+
+# Start building fuzz option
+fuzztype = xml.fuzzer.fuzz['type']
+dsplylvl = xml.fuzzer.display['level']
+writelvl = xml.fuzzer.write['level']
+exitlvl = xml.fuzzer.exit['level']
+exitcmd = xml.fuzzer.exit['cmd']
+print("[!] Fuzz type is:", fuzztype)
+print("[!] Display level:", dsplylvl)
+print("[!] Exit level:", exitlvl)
+print("[!] Exit command:", exitcmd)
+
+# Create unique folder to store fuzz data
+timestamp = time.strftime("%Y%m%d%H%M%S")
+print("[!] Creating folder:", timestamp)
+mkdirout =  subprocess.run(["mkdir "+timestamp], shell=True)
+
+# Begin fuzz logic
+
+# Chariter Fuzz
+if fuzztype == "chariter":
+	# Grab and print options
+	fuzzopt = xml.fuzzer.fuzz
+	fuzzcount = int(fuzzopt['length'])
+	fuzzlength = fuzzopt['length']
+	fuzzchar = fuzzopt['char']
+	fuzzprefix = fuzzopt['prefix']
+	print("[!] Fuzz prefix:", fuzzprefix)
+	print("[!] Fuzz character:", fuzzchar)
+	print("[!] Fuzz length:", fuzzlength)
+
+	# Begin the fuzz function
+	print("[!] Commencing fuzz.")
+	print("[!] You may be here a while.")
+	thefuzz = fuzzprefix
+	fuzzes = 0
+	errors = 0
+	for count in range(0, fuzzcount):
+		# Generate UUID for this fuzz
+		fuzzid = str(uuid.uuid1())
+		fuzzes = fuzzes+1
+		thefuzz = thefuzz+fuzzchar
+
+		# Begin pre fuzz script
+		prefuzz = xml.fuzzer.prefuzz['cmd']
+		prefcmd = subprocess.run([prefuzz], shell=True)
+
+		# Begin actual fuzzing
+		# Assemble!
+		fullcmd = precmd+" "+thefuzz+" "+postcmd
+		# Spawn a subprocess
+		procout =  subprocess.run([fullcmd], shell=True, \
+				universal_newlines=True, \
+				stdout=subprocess.PIPE, \
+				stderr=subprocess.STDOUT)
+
+		# Begin post fuzz script
+		postfuzz = xml.fuzzer.postfuzz['cmd']
+		postfcmd = subprocess.run([postfuzz], shell=True)
+
+		# If returncode is not 0, increment errors
+		if procout.returncode != 0:
+			errors = errors+1
+
+		# Display what to the screen based on return code
+		# * = Display everything no matter what.
+		# ! = Don't display anything at all.
+		# !0 = Display only when not 0
+		if dsplylvl == "*":
+			print("[!] Fuzz ID:", fuzzid)
+			print("[!] Return Code:",  procout.returncode)
+			print("[!] Ran:", fullcmd)
+			print("[!] Output:\n\n", procout.stdout)
+		if dsplylvl == "!0" and procout.returncode != 0:
+			print("[!] Fuzz ID:", fuzzid)
+			print("[!] Return Code:",  procout.returncode)
+			print("[!] Ran:", fullcmd)
+			print("[!] Output:\n\n", procout.stdout)
+
+		# Write what to file based on return code
+		# * = Write everything no matter what.
+		# ! = Don't write anything at all.
+		# !0 = Write only when not 0
+		if writelvl == "*":
+			rtrnstr = str(procout.returncode)
+			file = open(timestamp+"/"+fuzzid,'w')
+			file.write("Fuzz ID: "+fuzzid+"\n")
+			file.write("Ran: "+fullcmd+"\n")
+			file.write("Return Code: "+rtrnstr+"\n")
+			file.write("Output: \n\n"+procout.stdout+"\n")
+		if writelvl == "!0" and procout.returncode != 0:
+			rtrnstr = str(procout.returncode)
+			file = open(timestamp+"/"+fuzzid,'w')
+			file.write("Fuzz ID: "+fuzzid+"\n")
+			file.write("Ran: "+fullcmd+"\n")
+			file.write("Return Code: "+rtrnstr+"\n")
+			file.write("Output: \n\n"+procout.stdout+"\n")
+
+		# Decide to exit or not. 
+		# ! = Don't exit at all.
+		# !0 = Exit only when not 0
+		if exitlvl == "!0" and procout.returncode != 0:
+			print("[!] Exiting because you told me to.")
+			extcmdout = subprocess.run([exitcmd], \
+					shell=True, \
+					universal_newlines=True, \
+					stdout=subprocess.PIPE, \
+					stderr=subprocess.STDOUT)
+			print("[!] Exit command output:\n\n", \
+				extcmdout.stdout)
+			print("[!] Number of fuzzes:", fuzzes)
+			print("[!] Number of errors:", errors)
+			print("[!] Done.")
+			exit(0)
+
+# So long, fair well...
+print("[!] Number of fuzzes:", fuzzes)
+print("[!] Number of errors:", errors)
+print("[!] Done.")
+exit(0)
