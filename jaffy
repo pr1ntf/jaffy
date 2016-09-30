@@ -7,7 +7,6 @@ import subprocess
 import time
 
 # Read command line argument for XML file or URL
-print("[!] Parse command line arguments.")
 parser = argparse.ArgumentParser(description='Jaffy. Fuzz a binary. v1')
 parser.add_argument('filename', help='Path to XML file.')
 args = parser.parse_args()
@@ -137,7 +136,7 @@ if fuzztype == "chariter":
 			file.write("Return Code: "+rtrnstr+"\n")
 			file.write("Output: \n\n"+procout.stdout+"\n")
 
-		# Decide to exit or not. 
+		# Decide to exit or not.
 		# ! = Don't exit at all.
 		# !0 = Exit only when not 0
 		if exitlvl == "!0" and procout.returncode != 0:
