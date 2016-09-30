@@ -1,5 +1,5 @@
 # jaffy v1
-"Look ma, I made a fuzzer edition."
+"Look ma, I made a fuzzer" edition.
 
 *That's nice, dear.*
 
